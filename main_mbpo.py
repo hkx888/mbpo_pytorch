@@ -95,7 +95,7 @@ def readParser():
                         help='max length of path')
 
 
-    parser.add_argument('--model_type', default='tensorflow', metavar='A',
+    parser.add_argument('--model_type', default='pytorch', metavar='A',
                         help='predict model -- pytorch or tensorflow')
 
     parser.add_argument('--cuda', default=True, action="store_true",
@@ -107,7 +107,7 @@ def train(args, env_sampler, predict_env, agent, env_pool, model_pool):
     total_step = 0
     reward_sum = 0
     rollout_length = 1
-    exploration_before_start(args, env_sampler, env_pool, agent)
+    exploration_before_start(args, env_sampler, env_pool, agent) #开始使用真实环境采样，5000步，用的策略是随机初始化的sac
 
     for epoch_step in range(args.num_epoch):
         start_step = total_step
@@ -118,7 +118,7 @@ def train(args, env_sampler, predict_env, agent, env_pool, model_pool):
             if cur_step >= args.epoch_length and len(env_pool) > args.min_pool_size:
                 break
 
-            if cur_step > 0 and cur_step % args.model_train_freq == 0 and args.real_ratio < 1.0:
+            if cur_step > 0 and cur_step % args.model_train_freq == 0 and args.real_ratio < 1.0: #每隔一段时间重新训练model
                 train_predict_model(args, env_pool, predict_env)
 
                 new_rollout_length = set_rollout_length(args, epoch_step)
@@ -174,7 +174,7 @@ def set_rollout_length(args, epoch_step):
 
 def train_predict_model(args, env_pool, predict_env):
     # Get all samples from environment
-    state, action, reward, next_state, done = env_pool.sample(len(env_pool))
+    state, action, reward, next_state, done = env_pool.sample(len(env_pool)) #训练模型使用当前环境buffer中所有数据
     delta_state = next_state - state
     inputs = np.concatenate((state, action), axis=-1)
     labels = np.concatenate((np.reshape(reward, (reward.shape[0], -1)), delta_state), axis=-1)
@@ -215,9 +215,9 @@ def train_policy_repeats(args, total_step, train_step, cur_step, env_pool, model
     if train_step > args.max_train_repeat_per_step * total_step:
         return 0
 
-    for i in range(args.num_train_repeat):
+    for i in range(args.num_train_repeat): #model pool中有东西的话按比例采，训练sac 20轮
         env_batch_size = int(args.policy_train_batch_size * args.real_ratio)
-        model_batch_size = args.policy_train_batch_size - env_batch_size
+        model_batch_size = args.policy_train_batch_size - env_batch_size #real_ratio控制从真实环境和生成model采样的比例
 
         env_state, env_action, env_reward, env_next_state, env_done = env_pool.sample(int(env_batch_size))
 
@@ -235,7 +235,7 @@ def train_policy_repeats(args, total_step, train_step, cur_step, env_pool, model
 
         batch_reward, batch_done = np.squeeze(batch_reward), np.squeeze(batch_done)
         batch_done = (~batch_done).astype(int)
-        agent.update_parameters((batch_state, batch_action, batch_reward, batch_next_state, batch_done), args.policy_train_batch_size, i)
+        agent.update_parameters((batch_state, batch_action, batch_reward, batch_next_state, batch_done), args.policy_train_batch_size, i)  #更新SAC参数20次
 
     return args.num_train_repeat
 

@@ -177,7 +177,7 @@ class EnsembleModel(nn.Module):
         self.optimizer.zero_grad()
 
         loss += 0.01 * torch.sum(self.max_logvar) - 0.01 * torch.sum(self.min_logvar)
-        # print('loss:', loss.item())
+        print('loss:', loss.item())
         if self.use_decay:
             loss += self.get_decay_loss()
         loss.backward()
